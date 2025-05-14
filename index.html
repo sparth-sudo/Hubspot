@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Prospecting Map</title>
+  <style>
+    body, html {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      font-family: Arial, sans-serif;
+    }
+
+    #map {
+      height: 100%;
+      width: 100%;
+    }
+
+    #filter {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: white;
+      padding: 12px;
+      border-radius: 8px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+      z-index: 5;
+    }
+
+    #searchBox {
+      width: 200px;
+      padding: 6px;
+    }
+  </style>
+  <script
+  src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAWcQRhWVxOqYjleFpfaShYMdZfRmZb2_g&callback=initMap"
+  async
+  defer
+></script>
+</head>
+<body>
+  <div id="filter">
+    <input type="text" id="searchBox" placeholder="Filter by name or city" />
+  </div>
+  <div id="map"></div>
+
+  <script>
+    let map;
+    let markers = [];
+    let locationData = [];
+
+    async function initMap() {
+      map = new google.maps.Map(document.getElementById("map"), {
+        zoom: 5,
+        center: { lat: 39.5, lng: -98.35 }, // Center of the US
+      });
+
+      await fetchDataAndRender();
+
+      // Filter when typing
+      document.getElementById("searchBox").addEventListener("input", () => {
+        const query = document.getElementById("searchBox").value.toLowerCase();
+        const filtered = locationData.filter(
+          loc =>
+            loc.Name.toLowerCase().includes(query) ||
+            loc.City.toLowerCase().includes(query)
+        );
+        renderMarkers(filtered);
+      });
+
+      // Refresh data every 5 minutes
+      setInterval(fetchDataAndRender, 300000); // 300,000 ms = 5 min
+    }
+
+    async function fetchDataAndRender() {
+      try {
+        const response = await fetch("https://script.google.com/macros/s/AKfycbx7a5Yg-G2C-cW-m5QDQG4xCJxGHJiHF4BTMiAkMYleG-iALlGl98G3WK75JldQzV6syQ/exec"); // <-- Replace with your Apps Script URL
+        locationData = await response.json();
+        renderMarkers(locationData);
+      } catch (error) {
+        console.error("Error loading map data:", error);
+      }
+    }
+
+    function renderMarkers(locations) {
+      // Clear existing markers
+      markers.forEach(marker => marker.setMap(null));
+      markers = [];
+
+      locations.forEach(loc => {
+        const position = {
+          lat: parseFloat(loc.Latitude),
+          lng: parseFloat(loc.Longitude)
+        };
+
+        const marker = new google.maps.Marker({
+          position,
+          map,
+          title: loc.Name,
+          icon: getMarkerColor(loc.Classification)
+        });
+
+        const infoWindow = new google.maps.InfoWindow({
+          content: `
+            <div style="min-width:180px">
+              <strong>${loc.Name}</strong><br/>
+              ${loc.Address}<br/>
+              <em>${loc.Type}</em><br/>
+              <span>Market: ${loc.City}</span><br/>
+              <b>Status:</b> ${loc.Classification}
+            </div>
+          `
+        });
+
+        marker.addListener("click", () => {
+          infoWindow.open(map, marker);
+        });
+
+        markers.push(marker);
+      });
+    }
+
+    // Optional: assign color by classification
+    function getMarkerColor(classification) {
+      const colors = {
+        "In Pipeline": "http://maps.google.com/mapfiles/ms/icons/blue-dot.png",
+        "Purchase Refused": "http://maps.google.com/mapfiles/ms/icons/red-dot.png",
+        "Churned": "http://maps.google.com/mapfiles/ms/icons/yellow-dot.png",
+        "Active Site": "http://maps.google.com/mapfiles/ms/icons/green-dot.png",
+        "Not In Pipeline": "http://maps.google.com/mapfiles/ms/icons/grey-dot.png",
+        "No Classification": "http://maps.google.com/mapfiles/ms/icons/purple-dot.png"
+      };
+      return colors[classification] || "http://maps.google.com/mapfiles/ms/icons/orange-dot.png";
+    }
+
+
+  </script>
+</body>
+</html>
+
